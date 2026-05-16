@@ -1,0 +1,29 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/auth.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "api/auth.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "public/index.html"
+    }
+  ],
+  "env": {
+    "CLIENT_ID": "@client_id",
+    "CLIENT_SECRET": "@client_secret",
+    "TENANT_ID": "@tenant_id",
+    "REDIRECT_URI": "@redirect_uri"
+  }
+}
