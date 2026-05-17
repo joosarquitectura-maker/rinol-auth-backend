@@ -1,40 +1,85 @@
-// api/auth.js
-// Backend para manejar autenticación OAuth sin necesidad de consentimiento admin
-
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
-
-// ── CONFIGURACIÓN ──────────────────────────────────────────
-const CLIENT_ID = process.env.CLIENT_ID || "4ccb3c0e-439f-4571-a53f-b31b5138e50f";
-const CLIENT_SECRET = process.env.CLIENT_SECRET || "tu-secret-aqui"; // ⚠️ VER INSTRUCCIONES
-const TENANT_ID = process.env.TENANT_ID || "8abf00f8-2a9e-4312-b0d4-5f51b1230a96";
-const REDIRECT_URI = process.env.REDIRECT_URI || "http://localhost:3000/api/callback";
-
-// ── MIDDLEWARE ─────────────────────────────────────────────
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"]
-}));
+app.use(cors());
 app.use(express.json());
 
-// ── RUTA: Generar URL de login ─────────────────────────────
+const PORT = process.env.PORT || 3000;
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const TENANT_ID = process.env.TENANT_ID;
+const REDIRECT_URI = process.env.REDIRECT_URI;
+
+// ── RUTAS ──────────────────────────────────────────────────
 app.get('/api/login-url', (req, res) => {
-  const authUrl = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?` +
-    `client_id=${CLIENT_ID}&` +
-    `response_type=code&` +
-    `scope=${encodeURIComponent('offline_access https://graph.microsoft.com/.default')}&` +
-    `redirect_uri=${encodeURIComponent(REDIRECT_URI)}&` +
-    `prompt=select_account`;
-  
-  res.json({ authUrl });
+    const authUrl = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/authorize?` +
+        `client_id=${CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+        `&response_type=code` +
+        `&scope=https://graph.microsoft.com/.default` +
+        `&prompt=select_account`;
+    
+    res.json({ authUrl });
 });
 
-// ── RUTA: Callback (intercambia code por token) ────────────
+app.post('/api/callback', async (req, res) => {
+    const { code } = req.body;
+    
+    try {
+        const tokenResp = await axios.post(
+            `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`,
+            {
+                client_id: CLIENT_ID,
+                client_secret: CLIENT_SECRET,
+                code: code,
+                redirect_uri: REDIRECT_URI,
+                grant_type: 'authorization_code',
+                scope: 'https://graph.microsoft.com/.default'
+            }
+        );
+        
+        res.json({
+            access_token: tokenResp.data.access_token,
+            refresh_token: tokenResp.data.refresh_token
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.post('/api/graph-request', async (req, res) => {
+    const { access_token, method, url, data } = req.body;
+    
+    try {
+        const config = {
+            method: method,
+            url: url,
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+        
+        if (data) {
+            config.data = data;
+        }
+        
+        const response = await axios(config);
+        res.json(response.data);
+    } catch (error) {
+        console.error('Graph API Error:', error.response?.data || error.message);
+        res.status(error.response?.status || 400).json({ 
+            error: error.response?.data || error.message 
+        });
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`✅ RINOL Backend OAuth running on port ${PORT}`);
+});// ── RUTA: Callback (intercambia code por token) ────────────
 app.get('/api/callback', async (req, res) => {
   const code = req.query.code;
   const error = req.query.error;
