@@ -79,6 +79,51 @@ app.post('/api/graph-request', async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`✅ RINOL Backend OAuth running on port ${PORT}`);
+});                code: code,
+                redirect_uri: REDIRECT_URI,
+                grant_type: 'authorization_code',
+                scope: 'https://graph.microsoft.com/.default'
+            }
+        );
+        
+        res.json({
+            access_token: tokenResp.data.access_token,
+            refresh_token: tokenResp.data.refresh_token
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.post('/api/graph-request', async (req, res) => {
+    const { access_token, method, url, data } = req.body;
+    
+    try {
+        const config = {
+            method: method,
+            url: url,
+            headers: {
+                'Authorization': `Bearer ${access_token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+        
+        if (data) {
+            config.data = data;
+        }
+        
+        const response = await axios(config);
+        res.json(response.data);
+    } catch (error) {
+        console.error('Graph API Error:', error.response?.data || error.message);
+        res.status(error.response?.status || 400).json({ 
+            error: error.response?.data || error.message 
+        });
+    }
+});
+
+app.listen(PORT, () => {
+    console.log(`✅ RINOL Backend OAuth running on port ${PORT}`);
 });// ── RUTA: Callback (intercambia code por token) ────────────
 app.get('/api/callback', async (req, res) => {
   const code = req.query.code;
