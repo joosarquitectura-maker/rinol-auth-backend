@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>RINOL v18 - Aprobación Final</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        * { -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .safe-area { padding-top: max(env(safe-area-inset-top), 8px); }
+        .container-mobile {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background: #030303;
+        }
+        .header { 
+            flex-shrink: 0;
+            padding: 12px;
+            border-bottom: 1px solid #27272a;
+            background: #09090b;
+        }
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            -webkit-overflow-scrolling: touch;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .footer {
+            flex-shrink: 0;
+            padding: 12px;
+            border-top: 1px solid #27272a;
+            background: #09090b;
+        }
+        .panel {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .button-green {
+            background: linear-gradient(135deg, #16a34a, #059669);
+            color: white;
+        }
+        .button-green:active { opacity: 0.8; }
+        .button-green:disabled { opacity: 0.5; }
+        .button-blue {
+            background: linear-gradient(135deg, #2563eb, #0891b2);
+            color: white;
+        }
+        .button-blue:active { opacity: 0.8; }
+        .button-file {
+            background: #3b82f6;
+            color: white;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        .data-row {
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #27272a;
+        }
+        .data-row:last-child { border-bottom: none; }
+        .label { 
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #71717a;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .value {
+            font-size: 14px;
+            color: #f4f4f5;
+            font-weight: 500;
+        }
+        .value-large {
+            font-size: 20px;
+            color: #60a5fa;
+            font-weight: bold;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #ea580c;
+            color: white;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .session-badge {
+            display: inline-block;
+            padding: 6px 10px;
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #a1a1aa;
+            margin-top: 4px;
+        }
+        .table-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 8px;
+            background: #27272a;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+        .table-cell {
+            flex: 1;
+            min-width: 60px;
+        }
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
