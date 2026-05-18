@@ -1,9 +1,12 @@
+[build]
+  command = "npm install"
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+
+# Opcional: redirigir /api/* a las funciones
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/auth/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/*"
-  to = "/public/index.html"
   status = 200
