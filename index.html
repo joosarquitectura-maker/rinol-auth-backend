@@ -109,20 +109,303 @@
             font-size: 11px;
             font-weight: bold;
         }
-        .session-badge {
-            display: inline-block;
-            padding: 6px 10px;
-            background: #27272a;
-            border: 1px solid #3f3f46;
-            border-radius: 6px;
-            font-size: 11px;
-            color: #a1a1aa;
-            margin-top: 4px;
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
         }
-        .table-row {
+        .modal-backdrop.active {
             display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            padding: 8px;
-            background: #27272a;
-            b
+        }
+        .modal {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 90%;
+            max-height: 80%;
+            overflow-y: auto;
+            color: #f4f4f5;
+        }
+        .modal-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #60a5fa;
+            margin-bottom: 12px;
+        }
+        .modal-text {
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .modal-button-primary {
+            background: #3b82f6;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="safe-area">
+    <div class="container-mobile">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 16px; font-weight: bold; color: white;">COMPRAS COLOMBIA</h1>
+            <p style="margin: 4px 0 0 0; font-size: 9px; color: #3b82f6; font-weight: bold; letter-spacing: 0.3em;">v18.0 | BACKEND OAUTH</p>
+            <div style="margin-top: 8px;">
+                <input type="file" id="pdfInput" accept=".pdf" class="button button-file"/>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="panel">
+                <div style="font-size: 10px; font-weight: bold; color: #60a5fa; margin-bottom: 8px; text-transform: uppercase;">📋 DATOS DE LA ORDEN</div>
+                <div id="panelIzquierdo">
+                    <div class="label">Cargando PDF...</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div style="font-size: 10px; font-weight: bold; color: #f59e0b; margin-bottom: 8px; text-transform: uppercase;">📦 MATERIALES</div>
+                <div id="panelMateriales" style="font-size: 11px; color: #a1a1aa;">
+                    <div class="label">Esperando PDF...</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div style="font-size: 10px; font-weight: bold; color: #10b981; margin-bottom: 8px; text-transform: uppercase;">💰 TOTALES</div>
+                <div id="panelTotales">
+                    <div class="label">Esperando PDF...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div id="seccionAcciones" style="display: none;">
+                <button onclick="enviarAprobacion()" class="button button-green" style="margin-bottom: 8px;">✓ ENVIAR A OPERACIONES</button>
+                <button onclick="enviarFinanzas()" class="button button-blue" style="margin-bottom: 8px;">📊 ENVIAR A FINANZAS</button>
+                <div id="estadoEnvio" class="panel" style="display: none; font-size: 12px; font-weight: bold; text-align: center;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-title" id="modalTitle"></div>
+            <div class="modal-text" id="modalText"></div>
+            <button class="modal-button-primary" onclick="cerrarModal()">Aceptar</button>
+        </div>
+    </div>
+
+    <script>
+        const BACKEND_URL = "https://cozy-contentment-production.up.railway.app";
+        const SP_HOSTNAME = "rcrind.sharepoint.com";
+        const SP_SITE_PATH = "/sites/ComprasColombia";
+        const EXCEL_PATH = "/Documentos compartidos/Registro_OC_Aprobadas.xlsx";
+        const EXCEL_TABLE = "Registro_OC_Aprobadas";
+
+        const pdfjs = window['pdfjs-dist/build/pdf'];
+        pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        let dataExtraida = null;
+        let accessToken = null;
+
+        function mostrarModal(titulo, mensaje) {
+            document.getElementById("modalTitle").textContent = titulo;
+            document.getElementById("modalText").textContent = mensaje;
+            document.getElementById("modal").classList.add("active");
+        }
+
+        function cerrarModal() {
+            document.getElementById("modal").classList.remove("active");
+        }
+
+        document.getElementById('pdfInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+            const page = await pdf.getPage(1);
+            const textContent = await page.getTextContent();
+            const text = textContent.items.map(item => item.str).join(' ');
+
+            const regexOC = /OC[:\s]*([A-Z0-9]+)/i;
+            const regexProveedor = /Proveedor[:\s]*([^\n,]+)/i;
+            const regexNIT = /NIT[:\s]*([0-9]+)/;
+            const regexCC = /Centro[:\s]*([A-Z0-9]+)/i;
+            const regexFecha = /(\d{2}[\/\-]\d{2}[\/\-]\d{4})/;
+            const regexDinero = /[$]?\s*([\d.,]+)/g;
+
+            const dineros = [...text.matchAll(regexDinero)].map(m => m[1]).filter(d => parseFloat(d.replace(/[^\d.-]/g, '')) > 1000);
+
+            dataExtraida = {
+                oc: (text.match(regexOC) || ['', 'OC-001'])[1],
+                proveedor: (text.match(regexProveedor) || ['', 'Proveedor'])[1].trim(),
+                nit: (text.match(regexNIT) || ['', '000000000'])[1],
+                cCosto: (text.match(regexCC) || ['', 'CC-001'])[1],
+                fechaSol: (text.match(regexFecha) || ['', new Date().toLocaleDateString('es-CO')])[1],
+                vBase: dineros[0] || "0",
+                vIva: dineros[1] || "0",
+                vTotal: dineros[2] || dineros[0] || "0"
+            };
+
+            renderizarDatos();
+        });
+
+        function renderizarDatos() {
+            const data = dataExtraida;
+            document.getElementById("panelIzquierdo").innerHTML = `
+                <div class="data-row"><div class="label">OC</div><div class="value">${data.oc}</div></div>
+                <div class="data-row"><div class="label">Proveedor</div><div class="value">${data.proveedor}</div></div>
+                <div class="data-row"><div class="label">NIT</div><div class="value">${data.nit}</div></div>
+                <div class="data-row"><div class="label">Centro Costo</div><div class="value">${data.cCosto}</div></div>
+                <div class="data-row"><div class="label">Fecha</div><div class="value">${data.fechaSol}</div></div>
+            `;
+
+            document.getElementById("panelMateriales").innerHTML = '<div class="label">Sin items detectados</div>';
+
+            document.getElementById("panelTotales").innerHTML = `
+                <div class="data-row"><div class="label">Subtotal</div><div class="value">$ ${data.vBase}</div></div>
+                <div class="data-row"><div class="label">IVA</div><div class="value">$ ${data.vIva}</div></div>
+                <div class="data-row"><div class="label">Total</div><div class="value-large">$ ${data.vTotal}</div></div>
+                <div class="data-row"><div class="label">Estado</div><div class="status">Pendiente</div></div>
+            `;
+
+            document.getElementById("seccionAcciones").style.display = "block";
+        }
+
+        async function obtenerToken() {
+            return new Promise((resolve, reject) => {
+                fetch(`${BACKEND_URL}/api/login-url`)
+                    .then(r => r.json())
+                    .then(data => {
+                        const popup = window.open(data.authUrl, "login", "width=500,height=600");
+                        if (!popup) { reject(new Error("Popup bloqueado")); return; }
+                        
+                        const handleMessage = (event) => {
+                            if (event.data.access_token) {
+                                accessToken = event.data.access_token;
+                                window.removeEventListener('message', handleMessage);
+                                popup.close();
+                                resolve(accessToken);
+                            }
+                        };
+                        window.addEventListener('message', handleMessage);
+                        setTimeout(() => { popup.close(); reject(new Error("Timeout")); }, 120000);
+                    })
+                    .catch(err => reject(err));
+            });
+        }
+
+        async function enviarAprobacion() {
+            if (!dataExtraida) { mostrarModal("Error", "Carga un PDF primero"); return; }
+            await enviarAExcel("Operaciones");
+        }
+
+        async function enviarFinanzas() {
+            if (!dataExtraida) { mostrarModal("Error", "Carga un PDF primero"); return; }
+            await enviarAExcel("Finanzas");
+        }
+
+        async function enviarAExcel(destino) {
+            const estadoEl = document.getElementById("estadoEnvio");
+            estadoEl.style.display = "block";
+            estadoEl.style.background = "#1e40af";
+            estadoEl.style.color = "white";
+            estadoEl.innerHTML = "⏳ Autenticando...";
+
+            try {
+                if (!accessToken) {
+                    estadoEl.innerHTML = "⏳ Abriendo Microsoft...";
+                    accessToken = await obtenerToken();
+                }
+
+                estadoEl.innerHTML = "⏳ Registrando en Excel...";
+
+                const siteResp = await fetch(`${BACKEND_URL}/api/graph-request`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        access_token: accessToken,
+                        method: 'GET',
+                        url: `https://graph.microsoft.com/v1.0/sites/root:${SP_SITE_PATH}`
+                    })
+                });
+                
+                if (!siteResp.ok) throw new Error("Sitio no encontrado");
+                const siteData = await siteResp.json();
+                const siteId = siteData.id;
+
+                const fileResp = await fetch(`${BACKEND_URL}/api/graph-request`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        access_token: accessToken,
+                        method: 'GET',
+                        url: `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:${EXCEL_PATH}`
+                    })
+                });
+                
+                if (!fileResp.ok) throw new Error("Archivo no encontrado");
+                const fileData = await fileResp.json();
+                const fileId = fileData.id;
+
+                const nuevaFila = {
+                    values: [[
+                        dataExtraida.oc,
+                        dataExtraida.proveedor,
+                        dataExtraida.nit,
+                        dataExtraida.cCosto,
+                        dataExtraida.fechaSol,
+                        dataExtraida.vBase,
+                        dataExtraida.vIva,
+                        dataExtraida.vTotal,
+                        destino,
+                        new Date().toLocaleDateString('es-CO'),
+                        "Usuario"
+                    ]]
+                };
+
+                const addResp = await fetch(`${BACKEND_URL}/api/graph-request`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        access_token: accessToken,
+                        method: 'POST',
+                        url: `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/items/${fileId}/workbook/tables/${EXCEL_TABLE}/rows/add`,
+                        data: nuevaFila
+                    })
+                });
+
+                if (!addResp.ok) throw new Error("Error al registrar");
+
+                estadoEl.style.background = "#16a34a";
+                estadoEl.innerHTML = "✅ Registrado en Excel - " + destino;
+                mostrarModal("✅ Éxito", `OC: ${dataExtraida.oc}\nDestino: ${destino}\n\n¡Registrado exitosamente!`);
+
+            } catch (error) {
+                estadoEl.style.background = "#dc2626";
+                estadoEl.innerHTML = "❌ Error: " + error.message;
+                mostrarModal("❌ Error", "No se pudo registrar: " + error.message);
+            }
+        }
+
+        console.log("✅ RINOL v18 LISTO");
+        console.log("📍 Backend:", BACKEND_URL);
+    </script>
+</body>
+</html>
